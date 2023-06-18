@@ -4,7 +4,7 @@ from os.path import join
 import subprocess
 from utils.printer import dump_data
 import argparse
-
+import time
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FreeFuzz: a fuzzing frameword for deep learning library")
@@ -31,36 +31,58 @@ if __name__ == "__main__":
         # database configuration
         from classes.database import TorchDatabase
         TorchDatabase.database_config(host, port, mongo_cfg["torch_database"])
-
-        for api_name in TorchDatabase.get_api_list():
-            print(api_name)
-            if need_skip_torch(api_name):
-                continue
-            try:
-                res = subprocess.run(["python3", "FreeFuzz_api.py", config_name, "torch", api_name], shell=False, timeout=100)
-            except subprocess.TimeoutExpired:
-                dump_data(f"{api_name}\n", join(torch_output_dir, "timeout.txt"), "a")
-            except Exception as e:
-                dump_data(f"{api_name}\n  {e}\n", join(torch_output_dir, "runerror.txt"), "a")
-            else:
-                if res.returncode != 0:
-                    dump_data(f"{api_name}\n", join(torch_output_dir, "runcrash.txt"), "a")
+        s_time = time.time()
+        i_round = 0
+        to_break = False
+        while True:
+            api_list = TorchDatabase.get_api_list()
+            for i_api, api_name in enumerate(api_list):
+                lasted_time = time.time() - s_time
+                if lasted_time > 4 * 3600:
+                    to_break = True
+                    break
+                print(f'{i_round = }, {i_api}/{len(api_list)}: {api_name}\t\tlastted {lasted_time/60:.2f} min', flush=True)
+                if need_skip_torch(api_name):
+                    continue
+                try:
+                    res = subprocess.run(["python3", "FreeFuzz_api.py", config_name, "torch", api_name], shell=False, timeout=100)
+                except subprocess.TimeoutExpired:
+                    dump_data(f"{api_name}\n", join(torch_output_dir, "timeout.txt"), "a")
+                except Exception as e:
+                    dump_data(f"{api_name}\n  {e}\n", join(torch_output_dir, "runerror.txt"), "a")
+                else:
+                    if res.returncode != 0:
+                        dump_data(f"{api_name}\n", join(torch_output_dir, "runcrash.txt"), "a")
+            i_round += 1
+            if to_break:
+                break
     if "tf" in libs:
         # database configuration
         from classes.database import TFDatabase
         TFDatabase.database_config(host, port, mongo_cfg["tf_database"])
-
-        for api_name in TFDatabase.get_api_list():
-            print(api_name)
-            try:
-                res = subprocess.run(["python3", "FreeFuzz_api.py", config_name, "tf", api_name], shell=False, timeout=100)
-            except subprocess.TimeoutExpired:
-                dump_data(f"{api_name}\n", join(tf_output_dir, "timeout.txt"), "a")
-            except Exception as e:
-                dump_data(f"{api_name}\n  {e}\n", join(tf_output_dir, "runerror.txt"), "a")
-            else:
-                if res.returncode != 0:
-                    dump_data(f"{api_name}\n", join(tf_output_dir, "runcrash.txt"), "a")
+        s_time = time.time()
+        i_round = 0
+        to_break = False
+        while True:
+            api_list = TFDatabase.get_api_list()
+            for i_api, api_name in enumerate(api_list):
+                lasted_time = time.time() - s_time
+                if lasted_time > 4 * 3600:
+                    to_break = True
+                    break
+                print(f'{i_round = }, {i_api}/{len(api_list)}: {api_name}\t\tlastted {lasted_time/60:.2f} min', flush=True)
+                try:
+                    res = subprocess.run(["python3", "FreeFuzz_api.py", config_name, "tf", api_name], shell=False, timeout=100)
+                except subprocess.TimeoutExpired:
+                    dump_data(f"{api_name}\n", join(tf_output_dir, "timeout.txt"), "a")
+                except Exception as e:
+                    dump_data(f"{api_name}\n  {e}\n", join(tf_output_dir, "runerror.txt"), "a")
+                else:
+                    if res.returncode != 0:
+                        dump_data(f"{api_name}\n", join(tf_output_dir, "runcrash.txt"), "a")
+            i_round += 1
+            if to_break:
+                break
     
     not_test = []
     for l in libs:
