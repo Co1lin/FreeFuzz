@@ -1,1 +1,4 @@
 **/**.pyc
+src/trash
+src/torch-output*
+src/tf-output*
